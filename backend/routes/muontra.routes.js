@@ -1,0 +1,139 @@
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+
+// 1. Lấy danh sách đang mượn
+router.get("/dang-muon", async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT pm.id_phieu, dg.ho_ten, ds.ten_sach, ct.ma_vach_id, pm.ngay_muon, pm.han_tra
+            FROM phieumuon pm
+            JOIN docgia dg ON pm.id_doc_gia = dg.id_doc_gia
+            JOIN chitietphieumuon ct ON pm.id_phieu = ct.id_phieu
+            JOIN sach_vatly sv ON ct.ma_vach_id = sv.ma_vach_id
+            JOIN dausach ds ON sv.id_dau_sach = ds.id_dau_sach
+            WHERE ct.ngay_tra_thuc_te IS NULL
+            ORDER BY pm.ngay_muon DESC
+        `);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Tìm độc giả & Trả về ngày hết hạn để Frontend kiểm tra
+router.get("/find-reader/:id", async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            "SELECT ho_ten, trang_thai_the, ngay_het_han_the FROM docgia WHERE id_doc_gia = ?", 
+            [req.params.id.toUpperCase()]
+        );
+        if (rows.length > 0) res.json(rows[0]);
+        else res.status(404).json({ message: "Không tìm thấy" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Tìm sách
+router.get("/find-book/:barcode", async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT ds.ten_sach, sv.trang_thai 
+            FROM sach_vatly sv 
+            JOIN dausach ds ON sv.id_dau_sach = ds.id_dau_sach 
+            WHERE sv.ma_vach_id = ?`, [req.params.barcode.toUpperCase()]);
+        if (rows.length > 0) res.json(rows[0]);
+        else res.status(404).json({ message: "Không tìm thấy" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. API Mượn sách (Chặn triệt để thẻ hết hạn)
+router.post("/muon", async (req, res) => {
+    const { id_doc_gia, ma_vach_id, han_tra } = req.body;
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        // KIỂM TRA HẠN THẺ ĐỘC GIẢ
+        const [reader] = await connection.query(
+            "SELECT ngay_het_han_the FROM docgia WHERE id_doc_gia = ?", 
+            [id_doc_gia.toUpperCase()]
+        );
+
+        if (reader.length === 0) throw new Error("Độc giả không tồn tại");
+        
+        const ngayHetHan = new Date(reader[0].ngay_het_han_the);
+        if (ngayHetHan < new Date()) {
+            throw new Error(`Thẻ đã hết hạn vào ngày ${ngayHetHan.toLocaleDateString("vi-VN")}. Không thể mượn!`);
+        }
+
+        // KIỂM TRA TRẠNG THÁI SÁCH
+        const [book] = await connection.query(
+            "SELECT trang_thai FROM sach_vatly WHERE ma_vach_id = ?", 
+            [ma_vach_id.toUpperCase()]
+        );
+        if (book.length === 0) throw new Error("Sách không tồn tại");
+        if (book[0].trang_thai !== 'SanSang') throw new Error("Sách hiện đang được mượn");
+
+        // THỰC HIỆN MƯỢN
+        const [phieu] = await connection.query(
+            "INSERT INTO phieumuon (id_doc_gia, id_nhan_vien, ngay_muon, han_tra) VALUES (?, 'NV01', NOW(), ?)",
+            [id_doc_gia.toUpperCase(), han_tra]
+        );
+        
+        await connection.query(
+            "INSERT INTO chitietphieumuon (id_phieu, ma_vach_id) VALUES (?, ?)", 
+            [phieu.insertId, ma_vach_id.toUpperCase()]
+        );
+        
+        await connection.query(
+            "UPDATE sach_vatly SET trang_thai = 'DangMuon' WHERE ma_vach_id = ?", 
+            [ma_vach_id.toUpperCase()]
+        );
+        
+        await connection.commit();
+        res.json({ success: true });
+    } catch (err) {
+        await connection.rollback();
+        res.status(400).json({ error: err.message });
+    } finally { connection.release(); }
+});
+
+// 5. API Trả sách & Tính phạt
+router.post("/tra", async (req, res) => {
+    const { id_phieu, ma_vach_id } = req.body;
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        const [info] = await connection.query(`
+            SELECT dg.ho_ten, ds.ten_sach, pm.han_tra, DATEDIFF(NOW(), pm.han_tra) as tre
+            FROM phieumuon pm
+            JOIN docgia dg ON pm.id_doc_gia = dg.id_doc_gia
+            JOIN chitietphieumuon ct ON pm.id_phieu = ct.id_phieu
+            JOIN sach_vatly sv ON ct.ma_vach_id = sv.ma_vach_id
+            JOIN dausach ds ON sv.id_dau_sach = ds.id_dau_sach
+            WHERE pm.id_phieu = ? AND ct.ma_vach_id = ?
+        `, [id_phieu, ma_vach_id]);
+
+        if (info.length === 0) throw new Error("Không tìm thấy dữ liệu mượn");
+
+        const data = info[0];
+        const so_ngay_tre = data.tre > 0 ? data.tre : 0;
+        const tien_phat = so_ngay_tre * 5000;
+
+        await connection.query(`
+            UPDATE chitietphieumuon SET ngay_tra_thuc_te = NOW(), tien_phat_tre = ?
+            WHERE id_phieu = ? AND ma_vach_id = ?
+        `, [tien_phat, id_phieu, ma_vach_id]);
+
+        await connection.query("UPDATE sach_vatly SET trang_thai = 'SanSang' WHERE ma_vach_id = ?", [ma_vach_id]);
+        
+        await connection.commit();
+        res.json({ 
+            success: true, 
+            receipt: { ...data, so_ngay_tre, tien_phat, ngay_tra: new Date().toLocaleDateString("vi-VN") } 
+        });
+    } catch (err) {
+        await connection.rollback();
+        res.status(500).json({ error: err.message });
+    } finally { connection.release(); }
+});
+
+module.exports = router;
