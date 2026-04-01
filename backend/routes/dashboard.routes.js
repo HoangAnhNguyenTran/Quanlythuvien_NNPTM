@@ -3,10 +3,9 @@ const router = express.Router();
 const db = require("../config/db");
 
 // --- 1. ROUTE CHÍNH: GET /api/dashboard ---
-// Phục vụ cả DashboardHome và Quản lý đầu sách
 router.get("/", async (req, res) => {
   try {
-    // A. LẤY DANH SÁCH ĐẦU SÁCH (Cho trang Quản lý sách - Giúp không bị trắng trang)
+    // A. LẤY DANH SÁCH ĐẦU SÁCH (Cho trang Quản lý)
     const [bookList] = await db.query(`
       SELECT d.*, t.ten_the_loai 
       FROM dausach d 
@@ -14,7 +13,7 @@ router.get("/", async (req, res) => {
       ORDER BY d.id_dau_sach DESC
     `);
 
-    // B. LẤY THỐNG KÊ (Cho DashboardHome)
+    // B. LẤY THỐNG KÊ TỔNG QUAN (Thẻ số)
     const [books] = await db.query("SELECT COUNT(*) as total FROM dausach");
     const [readers] = await db.query("SELECT COUNT(*) as total FROM docgia");
     const [borrowing] = await db.query(
@@ -24,25 +23,47 @@ router.get("/", async (req, res) => {
       "SELECT SUM(COALESCE(tien_phat_tre, 0)) as total FROM chitietphieumuon"
     );
 
-    // C. TRUY VẤN BIỂU ĐỒ (6 tháng gần nhất)
-    const [chartData] = await db.query(`
-      SELECT 
-        DATE_FORMAT(ngay_muon, '%m/%Y') AS thang, 
-        COUNT(*) AS total 
+    // C. XU HƯỚNG MƯỢN THEO NGÀY (Biểu đồ miền/đường)
+    // Trả về định dạng: { date: "28/03", count: 5 }
+    const [trendData] = await db.query(`
+      SELECT DATE_FORMAT(ngay_muon, '%d/%m') AS date, COUNT(*) AS count 
       FROM phieumuon 
-      GROUP BY thang 
-      ORDER BY MIN(ngay_muon) ASC 
-      LIMIT 6
+      GROUP BY date 
+      ORDER BY MIN(ngay_muon) DESC 
+      LIMIT 15
     `);
 
-    // D. TRẢ VỀ OBJECT TỔNG HỢP
+    // D. THỐNG KÊ THEO THỂ LOẠI (Biểu đồ tròn)
+    const [genreData] = await db.query(`
+      SELECT t.ten_the_loai AS name, COUNT(ct.ma_vach_id) AS value
+      FROM chitietphieumuon ct
+      JOIN sach_vatly sv ON ct.ma_vach_id = sv.ma_vach_id
+      JOIN dausach ds ON sv.id_dau_sach = ds.id_dau_sach
+      JOIN theloai t ON ds.id_the_loai = t.id_the_loai
+      GROUP BY t.ten_the_loai
+    `);
+
+    // E. TOP 5 SÁCH MƯỢN NHIỀU NHẤT (Bảng danh sách)
+    const [topBooks] = await db.query(`
+      SELECT ds.ten_sach, COUNT(ct.ma_vach_id) AS so_luong
+      FROM chitietphieumuon ct
+      JOIN sach_vatly sv ON ct.ma_vach_id = sv.ma_vach_id
+      JOIN dausach ds ON sv.id_dau_sach = ds.id_dau_sach
+      GROUP BY ds.ten_sach
+      ORDER BY so_luong DESC 
+      LIMIT 5
+    `);
+
+    // F. TRẢ VỀ DỮ LIỆU TỔNG HỢP
     res.json({
-      bookList: bookList, // Mảng danh sách sách
+      bookList: bookList,
       tongDauSach: books[0]?.total || 0,
       tongDocGia: readers[0]?.total || 0,
       dangMuon: borrowing[0]?.total || 0,
       tienPhat: fines[0]?.total || 0,
-      muonTheoThang: chartData || []
+      trendData: trendData.reverse(), // Đảo ngược để hiển thị từ cũ đến mới trên biểu đồ
+      genreData: genreData || [],
+      topBooks: topBooks || []
     });
 
   } catch (err) {

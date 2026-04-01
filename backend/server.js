@@ -19,6 +19,7 @@ app.use("/api/muontra", muonTraRoutes);
 app.use("/api/dausach", dauSachRoutes);
 app.use("/api/docgia", docGiaRoutes); // ✅ 2. Đã thêm (Phải khớp với http://localhost:5000/api/docgia)
 app.use("/api/report", reportRoutes); 
+app.use('/uploads', express.static('uploads'));
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`🚀 Backend chạy tại http://localhost:${PORT}`));

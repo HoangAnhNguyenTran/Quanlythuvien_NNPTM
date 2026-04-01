@@ -6,7 +6,6 @@ function MuonTra() {
     const [readerInfo, setReaderInfo] = useState({ name: "", status: "", isExpired: false });
     const [bookInfo, setBookInfo] = useState({ name: "", status: "" });
     const [loans, setLoans] = useState([]);
-    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => { fetchLoans(); }, []);
 
@@ -63,15 +62,28 @@ function MuonTra() {
         }
     };
 
+    // --- 1. CẬP NHẬT HÀM TRẢ SÁCH (HIỂN THỊ CHI TIẾT TIỀN PHẠT) ---
     const handleReturn = async (id_phieu, ma_vach_id) => {
-        if (window.confirm("Xác nhận trả sách?")) {
+        if (window.confirm("Xác nhận trả sách và hoàn tất thủ tục?")) {
             try {
                 const res = await axios.post("http://localhost:5000/api/muontra/tra", { id_phieu, ma_vach_id });
                 if (res.data.success) {
-                    alert(res.data.receipt.tien_phat > 0 ? `Tiền phạt: ${res.data.receipt.tien_phat}đ` : "Thành công!");
+                    const receipt = res.data.receipt;
+                    if (receipt.tien_phat > 0) {
+                        alert(
+                            `Trả sách thành công!\n` +
+                            `--------------------------\n` +
+                            `Số ngày trễ: ${receipt.so_ngay_tre} ngày\n` +
+                            `Tiền phạt: ${receipt.tien_phat.toLocaleString('vi-VN')} VNĐ`
+                        );
+                    } else {
+                        alert("Trả sách thành công! (Sách trả đúng hạn)");
+                    }
                     fetchLoans();
                 }
-            } catch (err) { alert("Lỗi trả sách"); }
+            } catch (err) { 
+                alert("Lỗi trả sách: " + (err.response?.data?.error || "Lỗi hệ thống")); 
+            }
         }
     };
 
@@ -124,18 +136,32 @@ function MuonTra() {
                         </tr>
                     </thead>
                     <tbody>
-                        {loans.map((l, i) => (
-                            <tr key={i} style={trStyle}>
-                                <td style={tdStyle}><b>{l.ho_ten}</b></td>
-                                <td style={tdStyle}>{l.ten_sach}</td>
-                                <td style={{...tdStyle, color: new Date(l.han_tra) < new Date() ? "red" : "green"}}>
-                                    {new Date(l.han_tra).toLocaleDateString("vi-VN")}
-                                </td>
-                                <td style={tdStyle}>
-                                    <button onClick={() => handleReturn(l.id_phieu, l.ma_vach_id)} style={secondaryBtn}>TRẢ SÁCH</button>
-                                </td>
-                            </tr>
-                        ))}
+                        {loans.map((l, i) => {
+                            // --- 2. CẬP NHẬT LOGIC KIỂM TRA QUÁ HẠN ---
+                            const isOverdue = new Date(l.han_tra) < new Date();
+                            return (
+                                <tr key={i} style={trStyle}>
+                                    <td style={tdStyle}><b>{l.ho_ten}</b></td>
+                                    <td style={tdStyle}>{l.ten_sach}</td>
+                                    <td style={{
+                                        ...tdStyle, 
+                                        color: isOverdue ? "#e74c3c" : "#27ae60", 
+                                        fontWeight: isOverdue ? "bold" : "normal"
+                                    }}>
+                                        {new Date(l.han_tra).toLocaleDateString("vi-VN")}
+                                        {isOverdue && " (Quá hạn!)"}
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <button 
+                                            onClick={() => handleReturn(l.id_phieu, l.ma_vach_id)} 
+                                            style={secondaryBtn}
+                                        >
+                                            TRẢ SÁCH
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -143,7 +169,7 @@ function MuonTra() {
     );
 }
 
-// --- Styles giữ nguyên như bản trước của bạn ---
+// --- CSS IN JS ---
 const containerStyle = { padding: "25px", background: "#f8faff", minHeight: "100vh" };
 const titleStyle = { color: "#2c3e50", fontSize: "22px", fontWeight: "800", marginBottom: "25px" };
 const formCard = { background: "#fff", padding: "20px", borderRadius: "20px", border: "1px solid #f0f0f0", marginBottom: "25px" };
@@ -159,6 +185,6 @@ const theadStyle = { background: "#f8faff" };
 const thStyle = { padding: "15px 20px", textAlign: "left", color: "#718096", fontSize: "13px" };
 const trStyle = { borderBottom: "1px solid #f8faff" };
 const tdStyle = { padding: "15px 20px", fontSize: "14px" };
-const secondaryBtn = { background: "#fff1f0", color: "#ff4d4f", border: "1px solid #ffccc7", padding: "8px 15px", borderRadius: "8px", fontWeight: "600" };
+const secondaryBtn = { background: "#fff1f0", color: "#ff4d4f", border: "1px solid #ffccc7", padding: "8px 15px", borderRadius: "8px", fontWeight: "600", cursor: "pointer" };
 
 export default MuonTra;
