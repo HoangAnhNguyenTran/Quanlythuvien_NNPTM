@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { verifyToken } = require("./middleware/auth");
@@ -8,9 +9,10 @@ const muonTraRoutes = require("./routes/muontra.routes");
 const dauSachRoutes = require("./routes/dausach.routes");
 const docGiaRoutes = require("./routes/docgia.routes");
 const reportRoutes = require("./routes/report.routes");
+const statsRoutes = require("./routes/stats");
 
 const app = express();
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors({ origin: process.env.FRONTEND_ORIGIN }));
 app.use(express.json());
 
 // Route đăng nhập: công khai, không cần token
@@ -23,9 +25,10 @@ app.use("/api/muontra", verifyToken, muonTraRoutes);
 app.use("/api/dausach", verifyToken, dauSachRoutes);
 app.use("/api/docgia", verifyToken, docGiaRoutes);
 app.use("/api/report", verifyToken, reportRoutes);
+app.use("/api/stats", verifyToken, statsRoutes);
 app.use("/uploads", express.static("uploads"));
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`🚀 Backend chạy tại http://localhost:${PORT}`),
 );

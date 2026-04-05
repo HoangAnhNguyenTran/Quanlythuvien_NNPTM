@@ -55,10 +55,23 @@ export default function DashboardHome() {
           📈 Thống kê chung
         </h1>
         <button
-          onClick={() =>
-            (window.location.href =
-              "http://localhost:5000/api/report/export-no-sach")
-          }
+          onClick={async () => {
+            try {
+              const res = await API.get("/report/export-no-sach", {
+                responseType: "blob",
+              });
+              const url = window.URL.createObjectURL(new Blob([res.data]));
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "BaoCao_NoSach.xlsx";
+              a.click();
+              window.URL.revokeObjectURL(url);
+            } catch (err) {
+              alert(
+                "Không có sinh viên nào nợ sách quá hạn hoặc lỗi xuất file!",
+              );
+            }
+          }}
           style={exportBtnStyle}
         >
           📥 Xuất báo cáo Excel

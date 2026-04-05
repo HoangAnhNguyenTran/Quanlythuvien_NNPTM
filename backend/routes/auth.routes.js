@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = "SECRET_KEY_CUA_BAN";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post("/login", async (req, res) => {
   try {
