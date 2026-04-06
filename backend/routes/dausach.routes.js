@@ -112,7 +112,9 @@ router.delete("/:id", async (req, res) => {
       [id],
     );
     if (dangMuon[0].total > 0) {
-      return res.status(400).json({ error: "Không thể xóa! Có sách đang được mượn." });
+      return res
+        .status(400)
+        .json({ error: "Không thể xóa! Có sách đang được mượn." });
     }
 
     const [result] = await db.query(
@@ -127,15 +129,14 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-  }
 });
 
 // ================== 6. SINH MÃ VẠCH ==================
 router.post("/sinh-ma-vach", async (req, res) => {
-  const { id_dau_sach, so_luong } = req.body;
+  const { isbn, so_luong } = req.body;
   const qty = parseInt(so_luong);
 
-  if (!id_dau_sach || !qty || qty < 1) {
+  if (!isbn || !qty || qty < 1) {
     return res.status(400).json({ error: "Dữ liệu không hợp lệ!" });
   }
 
@@ -143,6 +144,19 @@ router.post("/sinh-ma-vach", async (req, res) => {
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
+
+    // Tìm id_dau_sach từ ISBN
+    const [book] = await connection.query(
+      "SELECT id_dau_sach FROM dausach WHERE isbn = ? AND da_xoa = 0",
+      [isbn.trim()],
+    );
+    if (book.length === 0) {
+      await connection.rollback();
+      return res
+        .status(404)
+        .json({ error: "Không tìm thấy đầu sách với ISBN này!" });
+    }
+    const id_dau_sach = book[0].id_dau_sach;
 
     const [last] = await connection.query(
       "SELECT ma_vach_id FROM sach_vatly ORDER BY ma_vach_id DESC LIMIT 1 FOR UPDATE",

@@ -61,14 +61,14 @@ function DauSach() {
     }
   };
 
-  const handleAddCopy = async (id_dau_sach) => {
+  const handleAddCopy = async (isbn) => {
     if (!addCopyQty || addCopyQty < 1) {
       alert("Số lượng phải lớn hơn 0!");
       return;
     }
     try {
       await API.post("/dausach/sinh-ma-vach", {
-        id_dau_sach,
+        isbn,
         so_luong: addCopyQty,
       });
       alert(`Thêm ${addCopyQty} bản sao thành công!`);
@@ -312,7 +312,7 @@ function DauSach() {
                             }}
                           />
                           <button
-                            onClick={() => handleAddCopy(b.id_dau_sach)}
+                            onClick={() => handleAddCopy(b.isbn)}
                             style={btnConfirm}
                           >
                             ✓

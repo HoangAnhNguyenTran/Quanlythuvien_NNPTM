@@ -1,12 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
-<<<<<<< Updated upstream
-=======
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const JWT_SECRET = process.env.JWT_SECRET;
->>>>>>> Stashed changes
 
 router.post("/login", async (req, res) => {
   try {
@@ -26,11 +23,6 @@ router.post("/login", async (req, res) => {
 
     const [results] = await db.query(sql, [username]);
 
-<<<<<<< Updated upstream
-    console.log("RESULT:", results);
-
-    if (results.length > 0) {
-=======
     const valid =
       results.length > 0 &&
       (await bcrypt.compare(password, results[0].mat_khau));
@@ -45,16 +37,15 @@ router.post("/login", async (req, res) => {
         JWT_SECRET,
         { expiresIn: "8h" },
       );
->>>>>>> Stashed changes
       return res.json({
         success: true,
+        token,
         name: results[0].ho_ten,
-        role: results[0].quyen
+        role: results[0].quyen,
       });
     }
 
     res.json({ success: false });
-
   } catch (err) {
     console.error("🔥 LOGIN ERROR:", err);
     res.status(500).json({ success: false });
