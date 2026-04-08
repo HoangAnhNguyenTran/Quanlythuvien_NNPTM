@@ -5,12 +5,12 @@ function DauSach() {
   const [books, setBooks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // State cho các danh mục đổ vào Dropdown
   const [metadata, setMetadata] = useState({
     authors: [],
     publishers: [],
-    shelves: []
+    shelves: [],
   });
 
   const [formData, setFormData] = useState({
@@ -21,7 +21,7 @@ function DauSach() {
     id_the_loai: "",
     file: null,
   });
-  
+
   const [editingId, setEditingId] = useState(null);
   const [addCopyId, setAddCopyId] = useState(null);
   const [addCopyQty, setAddCopyQty] = useState(1);
@@ -34,13 +34,15 @@ function DauSach() {
 
   const loadMetadata = async () => {
     try {
-        const [tg, nxb, ke] = await Promise.all([
-            axios.get("http://localhost:5000/api/tacgia"),
-            axios.get("http://localhost:5000/api/nxb"),
-            axios.get("http://localhost:5000/api/vitrike")
-        ]);
-        setMetadata({ authors: tg.data, publishers: nxb.data, shelves: ke.data });
-    } catch (err) { console.error("Lỗi tải danh mục metadata"); }
+      const [tg, nxb, ke] = await Promise.all([
+        axios.get("http://localhost:5000/api/tacgia"),
+        axios.get("http://localhost:5000/api/nxb"),
+        axios.get("http://localhost:5000/api/vitrike"),
+      ]);
+      setMetadata({ authors: tg.data, publishers: nxb.data, shelves: ke.data });
+    } catch (err) {
+      console.error("Lỗi tải danh mục metadata");
+    }
   };
 
   const fetchBooks = async () => {
@@ -96,12 +98,12 @@ function DauSach() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const data = new FormData();
-    Object.keys(formData).forEach(key => {
-        if (key === 'file') {
-            if (formData.file) data.append("hinh_anh", formData.file);
-        } else {
-            data.append(key, formData[key]);
-        }
+    Object.keys(formData).forEach((key) => {
+      if (key === "file") {
+        if (formData.file) data.append("hinh_anh", formData.file);
+      } else {
+        data.append(key, formData[key]);
+      }
     });
 
     try {
@@ -140,12 +142,23 @@ function DauSach() {
 
       {/* FORM NHẬP LIỆU HIỆN ĐẠI */}
       <div style={formCard}>
-        <div style={{ borderBottom: "1px solid #eee", marginBottom: "20px", paddingBottom: "10px" }}>
-            <span style={{ fontWeight: "700", color: editingId ? "#f1c40f" : "#5d78ff" }}>
-                {editingId ? "📝 CHẾ ĐỘ CHỈNH SỬA" : "➕ THÊM ĐẦU SÁCH MỚI"}
-            </span>
+        <div
+          style={{
+            borderBottom: "1px solid #eee",
+            marginBottom: "20px",
+            paddingBottom: "10px",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: "700",
+              color: editingId ? "#f1c40f" : "#5d78ff",
+            }}
+          >
+            {editingId ? "📝 CHẾ ĐỘ CHỈNH SỬA" : "➕ THÊM ĐẦU SÁCH MỚI"}
+          </span>
         </div>
-        
+
         <form onSubmit={handleSubmit} style={formGrid}>
           <input
             style={inputStyle}
@@ -207,11 +220,22 @@ function DauSach() {
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", height: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "flex-end",
+              height: "100%",
+            }}
+          >
             <button type="submit" style={editingId ? btnUpdate : btnAdd}>
               {editingId ? "Cập nhật" : "Thêm mới"}
             </button>
-            {editingId && <button type="button" onClick={handleReset} style={btnCancel}>Hủy</button>}
+            {editingId && (
+              <button type="button" onClick={handleReset} style={btnCancel}>
+                Hủy
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -222,9 +246,10 @@ function DauSach() {
           <thead>
             <tr style={theadStyle}>
               <th style={thStyle}>Ảnh</th>
+              <th style={thStyle}>ISBN</th>
               <th style={thStyle}>Thông tin sách</th>
               <th style={thStyle}>Tác giả</th>
-              <th style={thStyle}>Vị trí lưu trữ</th>
+              <th style={thStyle}>Thể loại</th>
               <th style={thStyle}>Hành động</th>
             </tr>
           </thead>
